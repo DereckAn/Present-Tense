@@ -1,108 +1,166 @@
-//
-//  DayLogViewModel.swift
-//  present-tense
-//
-//  Created by Dereck Ángeles on 4/28/25.
-//
-
-
 import Foundation
-import Combine // O @Observable directamente si usas iOS 17+
+import Combine // O @Observable
 
-// Para iOS 17+ puedes usar @Observable
-// @Observable
-// class DayLogViewModel { ... }
-
-// Para versiones anteriores (o si prefieres Combine explícito):
+// @Observable // Si usas iOS 17+
 class DayLogViewModel: ObservableObject {
 
-    @Published var activities: [ActivityLog] = [] // La lista de actividades que la vista observará
-    @Published var selectedDate: Date = Date() // Podrías añadir esto si quieres ver días pasados
+    @Published var activities: [ActivityLog] = []
+    // Hacemos que la fecha seleccionada sea @Published para que la vista pueda reaccionar
+    @Published var selectedDate: Date = Date() {
+        // Opcional: Podrías añadir lógica aquí si algo debe pasar *inmediatamente*
+        // cuando cambia la fecha, aunque generalmente el filtrado se hace
+        // en la propiedad computada o en la vista.
+        didSet {
+            print("Selected date changed to: \(selectedDate)")
+            // Aquí podrías disparar una carga de datos si fuera necesario para esa fecha
+        }
+    }
 
-    // Para este ejemplo, cargamos datos de muestra
+    // La propiedad computada ahora usa la @Published selectedDate
+    var activitiesForSelectedDate: [ActivityLog] {
+        let calendar = Calendar.current
+        // Filtra del array 'activities' completo
+        return activities.filter { calendar.isDate($0.timestamp, inSameDayAs: selectedDate) }
+                            .sorted { $0.timestamp < $1.timestamp } // Asegura orden dentro del día
+    }
+
+    // Mantenemos los formateadores
+    static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm" // "h:mm a" para AM/PM
+        return formatter
+    }()
+
+    // Formateador para el encabezado (Día número) - Ejemplo: "28"
+    static let dayNumberFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d"
+        return formatter
+    }()
+
+    // Formateador para el encabezado (Mes y Año) - Ejemplo: "April 2025"
+    static let monthYearFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy" // Mes completo y año
+        return formatter
+    }()
+
+     // Formateador para el encabezado (Año solo) - Ejemplo: "2025"
+    static let yearFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy"
+        return formatter
+    }()
+
+     // Formateador para el encabezado (Mes solo) - Ejemplo: "April"
+    static let monthFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM"
+        return formatter
+    }()
+
+
+    // Formateador para abreviatura del día de la semana (Ej: "MON")
+     static let shortDayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE" // Ejemplo: "Mon", "Tue"
+        // formatter.locale = Locale(identifier: "es_ES") // Si quieres español: "lun.", "mar."
+        return formatter
+    }()
+
+
     init() {
-        loadSampleData()
-        sortActivities()
+        loadSampleData() // Cargar datos iniciales (o cargar desde persistencia)
+        // Ya no necesitamos ordenar aquí si activitiesForSelectedDate ordena
     }
 
-    // --- Funciones CRUD (Crear, Leer, Actualizar, Borrar) ---
-
+    // --- Funciones CRUD (Sin cambios) ---
     func addActivity(description: String, timestamp: Date = Date()) {
-        // Validación simple
-        guard !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            print("Error: La descripción no puede estar vacía.")
-            return // O manejar el error de otra forma (mostrar alerta)
-        }
-        let newActivity = ActivityLog(timestamp: timestamp, description: description)
-        activities.append(newActivity)
-        sortActivities() // Mantener el orden
-        // Aquí iría la lógica para guardar permanentemente (Core Data, SwiftData, etc.)
+         guard !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+         // Asegúrate de que la nueva actividad use la *fecha* seleccionada pero la *hora* actual (o una elegida)
+         let calendar = Calendar.current
+         var components = calendar.dateComponents([.year, .month, .day], from: selectedDate)
+         let timeComponents = calendar.dateComponents([.hour, .minute, .second], from: timestamp) // Usa la hora de 'timestamp'
+         components.hour = timeComponents.hour
+         components.minute = timeComponents.minute
+         components.second = timeComponents.second
+
+         let finalTimestamp = calendar.date(from: components) ?? timestamp // Fallback a la hora original
+
+         let newActivity = ActivityLog(timestamp: finalTimestamp, description: description)
+         activities.append(newActivity)
+         // La vista se actualizará porque 'activities' es @Published y activitiesForSelectedDate se recalculará
+         // save() // Llamarías a tu función de guardado aquí
     }
 
-    func updateActivity(activity: ActivityLog) {
-        guard let index = activities.firstIndex(where: { $0.id == activity.id }) else {
-            print("Error: Actividad no encontrada para actualizar.")
-            return
-        }
+     func updateActivity(activity: ActivityLog) {
+        guard let index = activities.firstIndex(where: { $0.id == activity.id }) else { return }
         activities[index] = activity
-        sortActivities() // Reordenar por si cambió la hora
-        // Aquí iría la lógica para guardar permanentemente
+         // save()
     }
 
     func deleteActivity(at offsets: IndexSet) {
-        activities.remove(atOffsets: offsets)
-        // Aquí iría la lógica para guardar permanentemente
+        // Necesitamos mapear los offsets de la lista filtrada a la lista completa
+        let filteredActivities = activitiesForSelectedDate
+        let idsToDelete = offsets.map { filteredActivities[$0].id }
+        activities.removeAll { idsToDelete.contains($0.id) }
+        // save()
     }
 
+     // Helper para borrar por objeto (usado si no es por swipe)
      func deleteActivity(activity: ActivityLog) {
         activities.removeAll { $0.id == activity.id }
-        // Aquí iría la lógica para guardar permanentemente
-    }
+         // save()
+     }
 
 
-    // --- Lógica Auxiliar ---
-
-    private func sortActivities() {
-        // Ordena las actividades por fecha/hora, de más reciente a más antigua (o viceversa)
-        activities.sort { $0.timestamp < $1.timestamp } // Más antigua primero
-        // activities.sort { $0.timestamp > $1.timestamp } // Más reciente primero
-    }
-
-    // Filtra las actividades para mostrar solo las del día seleccionado
-    // (Útil si implementas navegación entre días)
-    var activitiesForSelectedDate: [ActivityLog] {
+    // --- Lógica de Fechas para la Semana ---
+    func getWeekDays(for date: Date) -> [Date] {
         let calendar = Calendar.current
-        return activities.filter { calendar.isDate($0.timestamp, inSameDayAs: selectedDate) }
+        guard let weekInterval = calendar.dateInterval(of: .weekOfYear, for: date) else {
+            return []
+        }
+
+        var weekDays: [Date] = []
+        var currentDate = weekInterval.start
+        let endDate = weekInterval.end
+
+        while currentDate < endDate {
+            weekDays.append(currentDate)
+            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: currentDate) else {
+                break
+            }
+            currentDate = nextDay
+        }
+        return weekDays
     }
 
-    // --- Datos de Muestra (solo para desarrollo) ---
+    // Días de la semana basados en la selectedDate
+    var currentWeekDays: [Date] {
+        getWeekDays(for: selectedDate)
+    }
+
+
+    // --- Datos de Muestra ---
     private func loadSampleData() {
-        // Puedes crear fechas específicas si quieres probar mejor
+        // Datos de muestra para hoy y quizás otros días para probar
         let calendar = Calendar.current
-        let now = Date()
-        let components = DateComponents(calendar: calendar, hour: 6, minute: 0)
-        let sixAM = calendar.date(byAdding: components, to: calendar.startOfDay(for: now)) ?? now
+        let today = Date()
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: today)!
 
-        activities = [
-            ActivityLog(timestamp: sixAM, description: "Despertar"),
-            ActivityLog(timestamp: calendar.date(byAdding: .hour, value: 1, to: sixAM)!, description: "Desayuno"),
-            ActivityLog(timestamp: calendar.date(byAdding: .hour, value: 3, to: sixAM)!, description: "Trabajo - Email"),
-            ActivityLog(timestamp: calendar.date(byAdding: .minute, value: 90, to: calendar.date(byAdding: .hour, value: 3, to: sixAM)!)!, description: "Reunión de equipo")
+         activities = [
+            // Hoy
+            ActivityLog(timestamp: calendar.date(bySettingHour: 6, minute: 0, second: 0, of: today)!, description: "Despertar"),
+            ActivityLog(timestamp: calendar.date(bySettingHour: 7, minute: 0, second: 0, of: today)!, description: "Desayuno"),
+            ActivityLog(timestamp: calendar.date(bySettingHour: 9, minute: 0, second: 0, of: today)!, description: "Trabajo - Email"),
+            ActivityLog(timestamp: calendar.date(bySettingHour: 9, minute: 15, second: 0, of: today)!, description: "Reunión de equipo"),
+            // Ayer
+            ActivityLog(timestamp: calendar.date(bySettingHour: 22, minute: 30, second: 0, of: yesterday)!, description: "Leer"),
+            ActivityLog(timestamp: calendar.date(bySettingHour: 23, minute: 15, second: 0, of: yesterday)!, description: "Dormir")
         ]
     }
 
-    // --- Formateadores (Helpers para la Vista) ---
-    // Es bueno tenerlos aquí para mantener la lógica de formato fuera de la Vista
-    static let timeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm" // Formato 24h (ej: 09:15) o "h:mm a" (ej: 9:15 AM)
-        return formatter
-    }()
-
-    static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium // "15 jun 2024"
-        formatter.timeStyle = .none
-        return formatter
-    }()
+    // --- Lógica de Guardado/Carga (Placeholder) ---
+    // func save() { /* Implementar guardado (SwiftData, CoreData, File) */ }
+    // func load() { /* Implementar carga */ }
 }

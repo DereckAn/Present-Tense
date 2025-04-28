@@ -1,78 +1,81 @@
-//
-//  ContentView.swift
-//  present-tense
-//
-//  Created by Dereck Ángeles on 4/28/25.
-//
-
-
 import SwiftUI
 
 struct ContentView: View {
-    // Instancia del ViewModel. @StateObject asegura que viva mientras la vista exista.
     @StateObject private var viewModel = DayLogViewModel()
-
-    // Estado para controlar si se muestra la sheet de añadir/editar
     @State private var showingAddEditSheet = false
-    @State private var activityToEdit: ActivityLog? = nil // Para saber qué editar
+    @State private var activityToEdit: ActivityLog? = nil
+    @State private var selectedTab: Tab = .timeline // Pestaña inicial
 
     var body: some View {
-        NavigationView { // O NavigationStack para navegación más moderna
-            VStack(alignment: .leading) {
-                // Muestra un mensaje si no hay actividades para el día
-                if viewModel.activitiesForSelectedDate.isEmpty {
-                    Text("No hay actividades registradas para hoy.\n¡Añade tu primera actividad!")
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity) // Centrar en el espacio disponible
-                } else {
-                    // Lista de actividades
-                    List {
-                        // Podrías agrupar por hora o simplemente mostrar la lista
-                        ForEach(viewModel.activitiesForSelectedDate) { activity in
-                            ActivityRowView(activity: activity)
-                                .contentShape(Rectangle()) // Hace toda la fila "tappable"
-                                .onTapGesture {
-                                    // Al tocar una fila, prepara para editarla
-                                    activityToEdit = activity
-                                    showingAddEditSheet = true
-                                }
-                        }
-                        .onDelete(perform: viewModel.deleteActivity) // Añade swipe-to-delete
-                    }
-                    // Opcional: Estilo de lista (si quieres quitar separadores, etc.)
-                    // .listStyle(.plain)
-                }
+        ZStack(alignment: .bottom) {
+            // Contenido principal de la pantalla
+            VStack(spacing: 0) {
+                // El contenido AHORA se determina completamente por el tab
+                tabContentView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                // Espacio muerto inferior para la TabBar
+                Spacer().frame(height: 90) // Ajusta si la altura de tu TabBar cambió
+
+            } // Fin VStack principal del contenido
+             // .ignoresSafeArea(edges: .bottom) // Considera si es necesario
+
+            // Barra de Navegación Inferior Personalizada
+            CustomTabView(selectedTab: $selectedTab) {
+                // Acción del botón "+"
+                activityToEdit = nil
+                showingAddEditSheet = true
             }
-            .navigationTitle("Hoy (\(Date(), formatter: DayLogViewModel.dateFormatter))") // Título con la fecha
-            // Opcional: Añadir un DatePicker para cambiar de día
-            // .toolbar { ToolbarItem(placement: .navigationBarLeading) { DatePicker(...) } }
-            .toolbar {
-                // Botón para añadir nueva actividad
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        activityToEdit = nil // Asegura que estamos añadiendo, no editando
-                        showingAddEditSheet = true
-                    } label: {
-                        Label("Añadir Actividad", systemImage: "plus.circle.fill")
-                    }
-                }
-                // Opcional: Botón Editar para el modo de edición de la lista (si no usas onTapGesture/onDelete)
-                // ToolbarItem(placement: .navigationBarLeading) { EditButton() }
-            }
-            // Presenta la vista modal (sheet) para añadir o editar
-            .sheet(isPresented: $showingAddEditSheet) {
-                // La vista necesita el viewModel y opcionalmente la actividad a editar
-                AddEditActivityView(viewModel: viewModel, activityToEdit: activityToEdit)
-            }
+
+        } // Fin ZStack principal
+        .sheet(isPresented: $showingAddEditSheet) {
+            // Asegúrate de pasar el ViewModel correcto
+            AddEditActivityView(viewModel: viewModel, activityToEdit: activityToEdit)
+                // Considera añadir .interactiveDismissDisabled() si no quieres que se cierre por swipe
         }
-        // Para iOS 16+ podrías usar NavigationStack en lugar de NavigationView
+        .navigationBarHidden(true) // Mantiene la barra de sistema oculta
+    }
+
+    // Función ViewBuilder para el contenido de cada tab
+    @ViewBuilder
+    private func tabContentView() -> some View {
+        switch selectedTab {
+        case .timeline:
+            // Muestra la vista Timeline dedicada
+            TimelineView(viewModel: viewModel) { activity in
+                // Acción que se ejecuta cuando se toca una actividad en TimelineView
+                self.activityToEdit = activity
+                self.showingAddEditSheet = true
+            }
+        case .calendar:
+            // Vista Placeholder para Calendar
+            Text("Calendar View")
+                .font(.largeTitle)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.purple.opacity(0.1)) // Fondo para diferenciar
+        case .diary:
+            // Vista Placeholder para Diary
+            Text("Diary View")
+                .font(.largeTitle)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.yellow.opacity(0.1)) // Fondo para diferenciar
+        case .plan:
+            // Vista Placeholder para Plan
+            Text("Plan View")
+                .font(.largeTitle)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.green.opacity(0.1))
+        case .settings:
+            // Vista Placeholder para Settings
+            Text("Settings View")
+                .font(.largeTitle)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.orange.opacity(0.1))
+        }
     }
 }
 
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
-        ContentView()
-    }
+// Preview para ContentView
+#Preview {
+    ContentView()
 }

@@ -9,14 +9,13 @@
 import SwiftUI
 
 // Enum para los tabs
+// (Dentro o fuera de ContentView, donde sea accesible)
 enum Tab {
-    case timeline, settings, plan
+    case timeline, calendar, diary, plan, settings // Añadidos calendar y diary
 }
 
 struct CustomTabView: View {
-    // Binding para saber qué tab está seleccionado y poder cambiarlo
     @Binding var selectedTab: Tab
-    // Closure para la acción del botón "+"
     let addAction: () -> Void
 
     var body: some View {
@@ -24,56 +23,60 @@ struct CustomTabView: View {
             // 1. La barra de navegación principal (HStack)
             HStack {
                 // Botón Timeline
-                TabButton(systemImage: "list.bullet", text: "Timeline",
-                          isSelected: selectedTab == .timeline) {
+                TabButton(systemImage: "list.bullet", text: "Timeline", isSelected: selectedTab == .timeline) {
                     selectedTab = .timeline
                 }
 
-                Spacer() // Espacio antes del botón "+"
-
-                // Botón Plan
-                TabButton(systemImage: "calendar.badge.clock", text: "Plan",
-                          isSelected: selectedTab == .plan) {
-                     selectedTab = .plan
+                // Botón Calendar
+                TabButton(systemImage: "calendar", text: "Calendar", isSelected: selectedTab == .calendar) {
+                    selectedTab = .calendar
                 }
 
-                Spacer() // Espacio simétrico
+                // Espacio central flexible donde "flotará" el botón +
+                Spacer()
+
+                // Botón Diary
+                TabButton(systemImage: "book.closed", text: "Diary", isSelected: selectedTab == .diary) {
+                    selectedTab = .diary
+                }
+
+                // Botón Plan (Considera si "Plan" sigue siendo necesario o si se fusiona con Calendar/Diary)
+                 TabButton(systemImage: "chart.bar", text: "Plan", isSelected: selectedTab == .plan) { // Cambié icono a algo más genérico
+                    selectedTab = .plan
+                 }
 
                  // Botón Settings
-                TabButton(systemImage: "gear", text: "Settings",
-                          isSelected: selectedTab == .settings) {
+                TabButton(systemImage: "gear", text: "Settings", isSelected: selectedTab == .settings) {
                     selectedTab = .settings
                 }
             }
             .padding(.horizontal)
-            .padding(.top, 12) // Espacio arriba dentro de la barra
-            .padding(.bottom, bottomSafeArea()) // Ajusta por el área segura inferior
-            .background(.thinMaterial) // Efecto translúcido
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous)) // Esquinas redondeadas
-            .shadow(color: .black.opacity(0.1), radius: 5, y: -3) // Sombra suave
-            .padding(.horizontal) // Espacio a los lados de la barra completa
+            .padding(.top, 12)
+            .padding(.bottom, bottomSafeArea())
+            .background(.thinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .shadow(color: .black.opacity(0.1), radius: 5, y: -3)
+            .padding(.horizontal)
 
-            // 2. El botón "+" flotante
+            // 2. El botón "+" flotante (permanece igual, pero su posición visual es entre Calendar y Diary)
             Button {
-                addAction() // Ejecuta la acción de añadir
+                addAction()
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 24, weight: .bold))
-                    .padding(18) // Hace el área táctil más grande y el círculo
+                    .padding(18)
                     .background(Color.blue)
                     .foregroundColor(.white)
                     .clipShape(Circle())
                     .shadow(radius: 5)
             }
-            // Ajusta la posición Y para que "suba"
-            // El valor exacto puede necesitar ajuste según el padding y tamaño del botón
-            .offset(y: -35) // Empuja el botón hacia arriba
+            .offset(y: -35) // Ajusta según sea necesario
+
         }
-        // Asegura que la ZStack no tome altura innecesaria por sí misma
-        .frame(height: 70 + bottomSafeArea()) // Altura fija estimada para la barra + safe area
+        .frame(height: 70 + bottomSafeArea())
     }
 
-    // Helper para obtener la altura del área segura inferior
+    // Helper para el área segura 
     private func bottomSafeArea() -> CGFloat {
         let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
         return windowScene?.windows.first?.safeAreaInsets.bottom ?? 0

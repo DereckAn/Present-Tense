@@ -1,3 +1,11 @@
+//
+//  WeekDayView.swift
+//  present-tense
+//
+//  Created by Dereck Ángeles on 4/28/25.
+//
+
+
 import SwiftUI
 
 struct WeekDayView: View {
