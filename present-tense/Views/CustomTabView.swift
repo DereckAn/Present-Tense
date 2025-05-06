@@ -19,7 +19,7 @@ struct CustomTabView: View {
     let addAction: () -> Void
 
     var body: some View {
-        ZStack(alignment: .bottom) {
+        ZStack(alignment: .center) {
             // 1. La barra de navegación principal (HStack)
             HStack {
                 // Botón Timeline
@@ -31,9 +31,6 @@ struct CustomTabView: View {
                 TabButton(systemImage: "calendar", text: "Calendar", isSelected: selectedTab == .calendar) {
                     selectedTab = .calendar
                 }
-
-                // Espacio central flexible donde "flotará" el botón +
-                Spacer()
 
                 // Botón Diary
                 TabButton(systemImage: "book.closed", text: "Diary", isSelected: selectedTab == .diary) {
@@ -52,11 +49,10 @@ struct CustomTabView: View {
             }
             .padding(.horizontal)
             .padding(.top, 12)
-            .padding(.bottom, bottomSafeArea())
+            .padding(.bottom, 12)
             .background(.thinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .shadow(color: .black.opacity(0.1), radius: 5, y: -3)
-            .padding(.horizontal)
 
             // 2. El botón "+" flotante (permanece igual, pero su posición visual es entre Calendar y Diary)
             Button {
@@ -70,10 +66,14 @@ struct CustomTabView: View {
                     .clipShape(Circle())
                     .shadow(radius: 5)
             }
-            .offset(y: -35) // Ajusta según sea necesario
+            .offset(x: 100, y: -70) // Ajusta según sea necesario
 
         }
-        .frame(height: 70 + bottomSafeArea())
+//        .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height - 100)  Centra la barra en la parte inferior
+        .frame(height: bottomSafeArea()) // Set a fixed height including safe area
+                
+        
+//        .frame(height: bottomSafeArea())
     }
 
     // Helper para el área segura 
